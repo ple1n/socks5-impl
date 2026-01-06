@@ -2,7 +2,7 @@
 
 use crate::{
     error::{Error, Result},
-    protocol::{Address, AddressType, AuthMethod, Command, Reply, StreamOperation, UserKey, Version},
+    protocol::{WireAddress, AddressType, AuthMethod, Command, Reply, StreamOperation, UserKey, Version},
 };
 use async_trait::async_trait;
 use std::{
@@ -69,25 +69,25 @@ pub trait Socks5Reader: AsyncReadExt + Unpin {
         }
     }
 
-    async fn read_address(&mut self) -> Result<Address> {
+    async fn read_address(&mut self) -> Result<WireAddress> {
         let atyp = self.read_atyp().await?;
         let addr = match atyp {
             AddressType::IPv4 => {
                 let mut ip = [0; 4];
                 self.read_exact(&mut ip).await?;
                 let port = self.read_u16().await?;
-                Address::from((Ipv4Addr::from(ip), port))
+                WireAddress::from((Ipv4Addr::from(ip), port))
             }
             AddressType::IPv6 => {
                 let mut ip = [0; 16];
                 self.read_exact(&mut ip).await?;
                 let port = self.read_u16().await?;
-                Address::from((Ipv6Addr::from(ip), port))
+                WireAddress::from((Ipv6Addr::from(ip), port))
             }
             AddressType::Domain => {
                 let str = self.read_string().await?;
                 let port = self.read_u16().await?;
-                Address::from((str, port))
+                WireAddress::from((str, port))
             }
         };
 
@@ -123,7 +123,7 @@ pub trait Socks5Reader: AsyncReadExt + Unpin {
         self.read_method().await
     }
 
-    async fn read_final(&mut self) -> Result<Address> {
+    async fn read_final(&mut self) -> Result<WireAddress> {
         self.read_version().await?;
         self.read_reply().await?;
         self.read_reserved().await?;
@@ -167,19 +167,19 @@ pub trait Socks5Writer: AsyncWriteExt + Unpin {
         Ok(())
     }
 
-    async fn write_address(&mut self, address: &Address) -> Result<()> {
+    async fn write_address(&mut self, address: &WireAddress) -> Result<()> {
         match address {
-            Address::SocketAddress(SocketAddr::V4(addr)) => {
+            WireAddress::SocketAddress(SocketAddr::V4(addr)) => {
                 self.write_atyp(AddressType::IPv4).await?;
                 self.write_all(&addr.ip().octets()).await?;
                 self.write_u16(addr.port()).await?;
             }
-            Address::SocketAddress(SocketAddr::V6(addr)) => {
+            WireAddress::SocketAddress(SocketAddr::V6(addr)) => {
                 self.write_atyp(AddressType::IPv6).await?;
                 self.write_all(&addr.ip().octets()).await?;
                 self.write_u16(addr.port()).await?;
             }
-            Address::DomainAddress(domain, port) => {
+            WireAddress::DomainAddress(domain, port) => {
                 self.write_atyp(AddressType::Domain).await?;
                 self.write_string(domain).await?;
                 self.write_u16(*port).await?;
@@ -218,7 +218,7 @@ pub trait Socks5Writer: AsyncWriteExt + Unpin {
         Ok(())
     }
 
-    async fn write_final(&mut self, command: Command, addr: &Address) -> Result<()> {
+    async fn write_final(&mut self, command: Command, addr: &WireAddress) -> Result<()> {
         self.write_version().await?;
         self.write_command(command).await?;
         self.write_reserved().await?;
@@ -244,12 +244,12 @@ where
     stream.read_auth_status().await
 }
 
-async fn init<S, A>(stream: &mut S, command: Command, addr: A, auth: Option<UserKey>) -> Result<Address>
+async fn init<S, A>(stream: &mut S, command: Command, addr: A, auth: Option<UserKey>) -> Result<WireAddress>
 where
     S: Socks5Writer + Socks5Reader + Send,
-    A: Into<Address>,
+    A: Into<WireAddress>,
 {
-    let addr: Address = addr.into();
+    let addr: WireAddress = addr.into();
 
     let mut methods = Vec::with_capacity(2);
     methods.push(AuthMethod::NoAuth);
@@ -291,10 +291,10 @@ where
 /// # Ok(())
 /// # }
 /// ```
-pub async fn connect<S, A>(socket: &mut S, addr: A, auth: Option<UserKey>) -> Result<Address>
+pub async fn connect<S, A>(socket: &mut S, addr: A, auth: Option<UserKey>) -> Result<WireAddress>
 where
     S: AsyncWriteExt + AsyncReadExt + Send + Unpin,
-    A: Into<Address>,
+    A: Into<WireAddress>,
 {
     init(socket, Command::Connect, addr, auth).await
 }
@@ -321,7 +321,7 @@ where
 #[derive(Debug)]
 pub struct SocksListener<S> {
     stream: S,
-    proxy_addr: Address,
+    proxy_addr: WireAddress,
 }
 
 impl<S> SocksListener<S>
@@ -333,17 +333,17 @@ where
     /// [`BIND`]: https://tools.ietf.org/html/rfc1928#page-6
     pub async fn bind<A>(mut stream: S, addr: A, auth: Option<UserKey>) -> Result<Self>
     where
-        A: Into<Address>,
+        A: Into<WireAddress>,
     {
         let addr = init(&mut stream, Command::Bind, addr, auth).await?;
         Ok(Self { stream, proxy_addr: addr })
     }
 
-    pub fn proxy_addr(&self) -> &Address {
+    pub fn proxy_addr(&self) -> &WireAddress {
         &self.proxy_addr
     }
 
-    pub async fn accept(mut self) -> Result<(S, Address)> {
+    pub async fn accept(mut self) -> Result<(S, WireAddress)> {
         let addr = self.stream.read_final().await?;
         Ok((self.stream, addr))
     }
@@ -353,7 +353,7 @@ where
 #[derive(Debug)]
 pub struct SocksDatagram<S> {
     socket: UdpSocket,
-    proxy_addr: Address,
+    proxy_addr: WireAddress,
     stream: S,
 }
 
@@ -378,7 +378,7 @@ where
     }
 
     /// Returns the address of the associated udp address.
-    pub fn proxy_addr(&self) -> &Address {
+    pub fn proxy_addr(&self) -> &WireAddress {
         &self.proxy_addr
     }
 
@@ -406,7 +406,7 @@ where
     //  The reference link is as follows:
     //  https://tools.ietf.org/html/rfc1928#page-8
     //
-    pub async fn build_socks5_udp_datagram(buf: &[u8], addr: &Address) -> Result<Vec<u8>> {
+    pub async fn build_socks5_udp_datagram(buf: &[u8], addr: &WireAddress) -> Result<Vec<u8>> {
         let bytes_size = Self::get_buf_size(addr.len(), buf.len());
         let bytes = Vec::with_capacity(bytes_size);
 
@@ -424,15 +424,15 @@ where
     /// Sends data via the udp socket to the given address.
     pub async fn send_to<A>(&self, buf: &[u8], addr: A) -> Result<usize>
     where
-        A: Into<Address>,
+        A: Into<WireAddress>,
     {
-        let addr: Address = addr.into();
+        let addr: WireAddress = addr.into();
         let bytes = Self::build_socks5_udp_datagram(buf, &addr).await?;
         Ok(self.socket.send(&bytes).await?)
     }
 
     /// Parses the udp-based server response packet, the format is same as the client request packet.
-    async fn parse_socks5_udp_response(bytes: &mut [u8], buf: &mut Vec<u8>) -> Result<(usize, Address)> {
+    async fn parse_socks5_udp_response(bytes: &mut [u8], buf: &mut Vec<u8>) -> Result<(usize, WireAddress)> {
         let len = bytes.len();
         let mut cursor = Cursor::new(bytes);
         cursor.read_reserved().await?;
@@ -446,7 +446,7 @@ where
     }
 
     /// Receives data from the udp socket and returns the number of bytes read and the origin of the data.
-    pub async fn recv_from(&self, timeout: Duration, buf: &mut Vec<u8>) -> Result<(usize, Address)> {
+    pub async fn recv_from(&self, timeout: Duration, buf: &mut Vec<u8>) -> Result<(usize, WireAddress)> {
         const UDP_MTU: usize = 1500;
         // let bytes_size = Self::get_buf_size(Address::max_serialized_len(), buf.len());
         let bytes_size = UDP_MTU;
@@ -470,21 +470,21 @@ pub type SocksUdpClient = SocksDatagram<GuardTcpStream>;
 pub trait UdpClientTrait {
     async fn send_to<A>(&mut self, buf: &[u8], addr: A) -> Result<usize>
     where
-        A: Into<Address> + Send + Unpin;
+        A: Into<WireAddress> + Send + Unpin;
 
-    async fn recv_from(&mut self, timeout: Duration, buf: &mut Vec<u8>) -> Result<(usize, Address)>;
+    async fn recv_from(&mut self, timeout: Duration, buf: &mut Vec<u8>) -> Result<(usize, WireAddress)>;
 }
 
 #[async_trait]
 impl UdpClientTrait for SocksUdpClient {
     async fn send_to<A>(&mut self, buf: &[u8], addr: A) -> Result<usize, Error>
     where
-        A: Into<Address> + Send + Unpin,
+        A: Into<WireAddress> + Send + Unpin,
     {
         SocksDatagram::send_to(self, buf, addr).await
     }
 
-    async fn recv_from(&mut self, timeout: Duration, buf: &mut Vec<u8>) -> Result<(usize, Address), Error> {
+    async fn recv_from(&mut self, timeout: Duration, buf: &mut Vec<u8>) -> Result<(usize, WireAddress), Error> {
         SocksDatagram::recv_from(self, timeout, buf).await
     }
 }
@@ -500,7 +500,7 @@ pub async fn create_udp_client<A: Into<SocketAddr>>(proxy_addr: A, auth: Option<
 
 pub struct UdpClientImpl<C> {
     client: C,
-    server_addr: Address,
+    server_addr: WireAddress,
 }
 
 impl UdpClientImpl<SocksUdpClient> {
@@ -517,7 +517,7 @@ impl UdpClientImpl<SocksUdpClient> {
     pub async fn datagram<A1, A2>(proxy_addr: A1, udp_server_addr: A2, auth: Option<UserKey>) -> Result<Self>
     where
         A1: Into<SocketAddr>,
-        A2: Into<Address>,
+        A2: Into<WireAddress>,
     {
         let client = create_udp_client(proxy_addr, auth).await?;
 
@@ -531,7 +531,7 @@ impl UdpClientImpl<SocksUdpClient> {
 mod tests {
     use crate::{
         client::{self, SocksListener, SocksUdpClient, UdpClientTrait},
-        protocol::{Address, UserKey},
+        protocol::{WireAddress, UserKey},
         Error, Result,
     };
     use async_trait::async_trait;
@@ -552,7 +552,7 @@ mod tests {
     async fn connect(addr: &str, auth: Option<UserKey>) {
         let socket = TcpStream::connect(addr).await.unwrap();
         let mut socket = BufStream::new(socket);
-        client::connect(&mut socket, Address::from(("baidu.com", 80)), auth).await.unwrap();
+        client::connect(&mut socket, WireAddress::from(("baidu.com", 80)), auth).await.unwrap();
     }
 
     #[ignore]
@@ -578,7 +578,7 @@ mod tests {
     #[tokio::test]
     async fn bind() {
         let run_block = async {
-            let server_addr = Address::from(("127.0.0.1", 8000));
+            let server_addr = WireAddress::from(("127.0.0.1", 8000));
 
             let client = TcpStream::connect(PROXY_ADDR).await?;
             let client = BufStream::new(client);
@@ -607,12 +607,12 @@ mod tests {
     impl UdpClientTrait for TestHalves {
         async fn send_to<A>(&mut self, buf: &[u8], addr: A) -> Result<usize, Error>
         where
-            A: Into<Address> + Send,
+            A: Into<WireAddress> + Send,
         {
             self.1.send_to(buf, addr).await
         }
 
-        async fn recv_from(&mut self, timeout: Duration, buf: &mut Vec<u8>) -> Result<(usize, Address), Error> {
+        async fn recv_from(&mut self, timeout: Duration, buf: &mut Vec<u8>) -> Result<(usize, WireAddress), Error> {
             self.0.recv_from(timeout, buf).await
         }
     }
@@ -622,7 +622,7 @@ mod tests {
     struct UdpTest<C> {
         client: C,
         server: UdpSocket,
-        server_addr: Address,
+        server_addr: WireAddress,
     }
 
     impl<C: UdpClientTrait> UdpTest<C> {
@@ -649,7 +649,7 @@ mod tests {
 
             let server_addr: SocketAddr = SERVER_ADDR.parse().unwrap();
             let server = UdpSocket::bind(server_addr).await.unwrap();
-            let server_addr = Address::from(server_addr);
+            let server_addr = WireAddress::from(server_addr);
 
             Self {
                 client,

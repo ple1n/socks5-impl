@@ -1,6 +1,6 @@
 #[cfg(feature = "tokio")]
 use crate::protocol::AsyncStreamOperation;
-use crate::protocol::{Address, Reply, StreamOperation, Version};
+use crate::protocol::{WireAddress, Reply, StreamOperation, Version};
 #[cfg(feature = "tokio")]
 use async_trait::async_trait;
 #[cfg(feature = "tokio")]
@@ -18,11 +18,11 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 #[derive(Clone, Debug)]
 pub struct Response {
     pub reply: Reply,
-    pub address: Address,
+    pub address: WireAddress,
 }
 
 impl Response {
-    pub fn new(reply: Reply, address: Address) -> Self {
+    pub fn new(reply: Reply, address: WireAddress) -> Self {
         Self { reply, address }
     }
 }
@@ -42,7 +42,7 @@ impl StreamOperation for Response {
         stream.read_exact(&mut buf)?;
 
         let reply = Reply::try_from(buf[0])?;
-        let address = Address::retrieve_from_stream(stream)?;
+        let address = WireAddress::retrieve_from_stream(stream)?;
 
         Ok(Self { reply, address })
     }
@@ -77,7 +77,7 @@ impl AsyncStreamOperation for Response {
         r.read_exact(&mut buf).await?;
 
         let reply = Reply::try_from(buf[0])?;
-        let address = Address::retrieve_from_async_stream(r).await?;
+        let address = WireAddress::retrieve_from_async_stream(r).await?;
 
         Ok(Self { reply, address })
     }

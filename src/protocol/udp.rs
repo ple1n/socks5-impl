@@ -1,6 +1,6 @@
 #[cfg(feature = "tokio")]
 use crate::protocol::AsyncStreamOperation;
-use crate::protocol::{Address, StreamOperation};
+use crate::protocol::{WireAddress, StreamOperation};
 #[cfg(feature = "tokio")]
 use async_trait::async_trait;
 #[cfg(feature = "tokio")]
@@ -18,16 +18,16 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 #[derive(Clone, Debug)]
 pub struct UdpHeader {
     pub frag: u8,
-    pub address: Address,
+    pub address: WireAddress,
 }
 
 impl UdpHeader {
-    pub fn new(frag: u8, address: Address) -> Self {
+    pub fn new(frag: u8, address: WireAddress) -> Self {
         Self { frag, address }
     }
 
     pub const fn max_serialized_len() -> usize {
-        3 + Address::max_serialized_len()
+        3 + WireAddress::max_serialized_len()
     }
 }
 
@@ -38,7 +38,7 @@ impl StreamOperation for UdpHeader {
 
         let frag = buf[2];
 
-        let address = Address::retrieve_from_stream(stream)?;
+        let address = WireAddress::retrieve_from_stream(stream)?;
         Ok(Self { frag, address })
     }
 
@@ -65,7 +65,7 @@ impl AsyncStreamOperation for UdpHeader {
 
         let frag = buf[2];
 
-        let address = Address::retrieve_from_async_stream(r).await?;
+        let address = WireAddress::retrieve_from_async_stream(r).await?;
         Ok(Self { frag, address })
     }
 }

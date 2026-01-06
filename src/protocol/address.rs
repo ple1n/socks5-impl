@@ -42,6 +42,7 @@ impl From<AddressType> for u8 {
     }
 }
 
+/// Address supplied to proxy server
 /// SOCKS5 Adderss Format
 ///
 /// ```plain
@@ -52,14 +53,14 @@ impl From<AddressType> for u8 {
 /// +------+----------+----------+
 /// ```
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum Address {
+pub enum WireAddress {
     SocketAddress(SocketAddr),
     DomainAddress(String, u16),
 }
 
-impl Address {
+impl WireAddress {
     pub fn unspecified() -> Self {
-        Address::SocketAddress(SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)))
+        WireAddress::SocketAddress(SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)))
     }
 
     pub fn get_type(&self) -> AddressType {
@@ -89,7 +90,7 @@ impl Address {
     }
 }
 
-impl StreamOperation for Address {
+impl StreamOperation for WireAddress {
     fn retrieve_from_stream<R: std::io::Read>(stream: &mut R) -> std::io::Result<Self> {
         let mut atyp = [0; 1];
         stream.read_exact(&mut atyp)?;
@@ -157,16 +158,16 @@ impl StreamOperation for Address {
 
     fn len(&self) -> usize {
         match self {
-            Address::SocketAddress(SocketAddr::V4(_)) => 1 + 4 + 2,
-            Address::SocketAddress(SocketAddr::V6(_)) => 1 + 16 + 2,
-            Address::DomainAddress(addr, _) => 1 + 1 + addr.len() + 2,
+            WireAddress::SocketAddress(SocketAddr::V4(_)) => 1 + 4 + 2,
+            WireAddress::SocketAddress(SocketAddr::V6(_)) => 1 + 16 + 2,
+            WireAddress::DomainAddress(addr, _) => 1 + 1 + addr.len() + 2,
         }
     }
 }
 
 #[cfg(feature = "tokio")]
 #[async_trait]
-impl AsyncStreamOperation for Address {
+impl AsyncStreamOperation for WireAddress {
     async fn retrieve_from_async_stream<R>(stream: &mut R) -> std::io::Result<Self>
     where
         R: AsyncRead + Unpin + Send,
@@ -209,33 +210,33 @@ impl AsyncStreamOperation for Address {
     }
 }
 
-impl ToSocketAddrs for Address {
+impl ToSocketAddrs for WireAddress {
     type Iter = std::vec::IntoIter<SocketAddr>;
 
     fn to_socket_addrs(&self) -> std::io::Result<Self::Iter> {
         match self {
-            Address::SocketAddress(addr) => Ok(vec![*addr].into_iter()),
-            Address::DomainAddress(addr, port) => Ok((addr.as_str(), *port).to_socket_addrs()?),
+            WireAddress::SocketAddress(addr) => Ok(vec![*addr].into_iter()),
+            WireAddress::DomainAddress(addr, port) => Ok((addr.as_str(), *port).to_socket_addrs()?),
         }
     }
 }
 
-impl std::fmt::Display for Address {
+impl std::fmt::Display for WireAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Address::DomainAddress(hostname, port) => write!(f, "{hostname}:{port}"),
-            Address::SocketAddress(socket_addr) => write!(f, "{socket_addr}"),
+            WireAddress::DomainAddress(hostname, port) => write!(f, "{hostname}:{port}"),
+            WireAddress::SocketAddress(socket_addr) => write!(f, "{socket_addr}"),
         }
     }
 }
 
-impl TryFrom<Address> for SocketAddr {
+impl TryFrom<WireAddress> for SocketAddr {
     type Error = std::io::Error;
 
-    fn try_from(address: Address) -> std::result::Result<Self, Self::Error> {
+    fn try_from(address: WireAddress) -> std::result::Result<Self, Self::Error> {
         match address {
-            Address::SocketAddress(addr) => Ok(addr),
-            Address::DomainAddress(addr, port) => {
+            WireAddress::SocketAddress(addr) => Ok(addr),
+            WireAddress::DomainAddress(addr, port) => {
                 if let Ok(addr) = addr.parse::<Ipv4Addr>() {
                     Ok(SocketAddr::from((addr, port)))
                 } else if let Ok(addr) = addr.parse::<Ipv6Addr>() {
@@ -249,23 +250,23 @@ impl TryFrom<Address> for SocketAddr {
     }
 }
 
-impl TryFrom<&Address> for SocketAddr {
+impl TryFrom<&WireAddress> for SocketAddr {
     type Error = std::io::Error;
 
-    fn try_from(address: &Address) -> std::result::Result<Self, Self::Error> {
-        TryFrom::<Address>::try_from(address.clone())
+    fn try_from(address: &WireAddress) -> std::result::Result<Self, Self::Error> {
+        TryFrom::<WireAddress>::try_from(address.clone())
     }
 }
 
-impl From<Address> for Vec<u8> {
-    fn from(addr: Address) -> Self {
+impl From<WireAddress> for Vec<u8> {
+    fn from(addr: WireAddress) -> Self {
         let mut buf = Vec::with_capacity(addr.len());
         addr.write_to_buf(&mut buf);
         buf
     }
 }
 
-impl TryFrom<Vec<u8>> for Address {
+impl TryFrom<Vec<u8>> for WireAddress {
     type Error = std::io::Error;
 
     fn try_from(data: Vec<u8>) -> std::result::Result<Self, Self::Error> {
@@ -274,7 +275,7 @@ impl TryFrom<Vec<u8>> for Address {
     }
 }
 
-impl TryFrom<&[u8]> for Address {
+impl TryFrom<&[u8]> for WireAddress {
     type Error = std::io::Error;
 
     fn try_from(data: &[u8]) -> std::result::Result<Self, Self::Error> {
@@ -283,60 +284,60 @@ impl TryFrom<&[u8]> for Address {
     }
 }
 
-impl From<SocketAddr> for Address {
+impl From<SocketAddr> for WireAddress {
     fn from(addr: SocketAddr) -> Self {
-        Address::SocketAddress(addr)
+        WireAddress::SocketAddress(addr)
     }
 }
 
-impl From<&SocketAddr> for Address {
+impl From<&SocketAddr> for WireAddress {
     fn from(addr: &SocketAddr) -> Self {
-        Address::SocketAddress(*addr)
+        WireAddress::SocketAddress(*addr)
     }
 }
 
-impl From<(Ipv4Addr, u16)> for Address {
+impl From<(Ipv4Addr, u16)> for WireAddress {
     fn from((addr, port): (Ipv4Addr, u16)) -> Self {
-        Address::SocketAddress(SocketAddr::from((addr, port)))
+        WireAddress::SocketAddress(SocketAddr::from((addr, port)))
     }
 }
 
-impl From<(Ipv6Addr, u16)> for Address {
+impl From<(Ipv6Addr, u16)> for WireAddress {
     fn from((addr, port): (Ipv6Addr, u16)) -> Self {
-        Address::SocketAddress(SocketAddr::from((addr, port)))
+        WireAddress::SocketAddress(SocketAddr::from((addr, port)))
     }
 }
 
-impl From<(IpAddr, u16)> for Address {
+impl From<(IpAddr, u16)> for WireAddress {
     fn from((addr, port): (IpAddr, u16)) -> Self {
-        Address::SocketAddress(SocketAddr::from((addr, port)))
+        WireAddress::SocketAddress(SocketAddr::from((addr, port)))
     }
 }
 
-impl From<(String, u16)> for Address {
+impl From<(String, u16)> for WireAddress {
     fn from((addr, port): (String, u16)) -> Self {
-        Address::DomainAddress(addr, port)
+        WireAddress::DomainAddress(addr, port)
     }
 }
 
-impl From<(&str, u16)> for Address {
+impl From<(&str, u16)> for WireAddress {
     fn from((addr, port): (&str, u16)) -> Self {
-        Address::DomainAddress(addr.to_owned(), port)
+        WireAddress::DomainAddress(addr.to_owned(), port)
     }
 }
 
-impl From<&Address> for Address {
-    fn from(addr: &Address) -> Self {
+impl From<&WireAddress> for WireAddress {
+    fn from(addr: &WireAddress) -> Self {
         addr.clone()
     }
 }
 
-impl TryFrom<&str> for Address {
+impl TryFrom<&str> for WireAddress {
     type Error = crate::Error;
 
     fn try_from(addr: &str) -> std::result::Result<Self, Self::Error> {
         if let Ok(addr) = addr.parse::<SocketAddr>() {
-            Ok(Address::SocketAddress(addr))
+            Ok(WireAddress::SocketAddress(addr))
         } else {
             let (addr, port) = if let Some(pos) = addr.rfind(':') {
                 (&addr[..pos], &addr[pos + 1..])
@@ -344,7 +345,7 @@ impl TryFrom<&str> for Address {
                 (addr, "0")
             };
             let port = port.parse::<u16>()?;
-            Ok(Address::DomainAddress(addr.to_owned(), port))
+            Ok(WireAddress::DomainAddress(addr.to_owned(), port))
         }
     }
 }

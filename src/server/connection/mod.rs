@@ -1,6 +1,6 @@
 use self::{associate::UdpAssociate, bind::Bind, connect::Connect};
 use crate::{
-    protocol::{self, handshake, Address, AsyncStreamOperation, AuthMethod, Command},
+    protocol::{self, handshake, WireAddress, AsyncStreamOperation, AuthMethod, Command},
     server::AuthAdaptor,
 };
 use std::{net::SocketAddr, time::Duration};
@@ -263,7 +263,7 @@ impl From<Authenticated> for TcpStream {
 /// - Connect
 #[derive(Debug)]
 pub enum ClientConnection {
-    UdpAssociate(UdpAssociate<associate::NeedReply>, Address),
-    Bind(Bind<bind::NeedFirstReply>, Address),
-    Connect(Connect<connect::NeedReply>, Address),
+    UdpAssociate(UdpAssociate<associate::NeedReply>, WireAddress),
+    Bind(Bind<bind::NeedFirstReply>, WireAddress),
+    Connect(Connect<connect::NeedReply>, WireAddress),
 }

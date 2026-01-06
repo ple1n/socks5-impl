@@ -1,5 +1,5 @@
 use socks5_impl::{
-    protocol::{Address, Reply, UdpHeader},
+    protocol::{WireAddress, Reply, UdpHeader},
     server::{auth, connection::associate, AssociatedUdpSocket, ClientConnection, IncomingConnection, Server, UdpAssociate},
     Error, Result,
 };
@@ -130,21 +130,21 @@ where
             handle_s5_upd_associate(associate).await?;
         }
         ClientConnection::Bind(bind, _) => {
-            let mut conn = bind.reply(Reply::CommandNotSupported, Address::unspecified()).await?;
+            let mut conn = bind.reply(Reply::CommandNotSupported, WireAddress::unspecified()).await?;
             conn.shutdown().await?;
         }
         ClientConnection::Connect(connect, addr) => {
             let target = match addr {
-                Address::DomainAddress(domain, port) => TcpStream::connect((domain, port)).await,
-                Address::SocketAddress(addr) => TcpStream::connect(addr).await,
+                WireAddress::DomainAddress(domain, port) => TcpStream::connect((domain, port)).await,
+                WireAddress::SocketAddress(addr) => TcpStream::connect(addr).await,
             };
 
             if let Ok(mut target) = target {
-                let mut conn = connect.reply(Reply::Succeeded, Address::unspecified()).await?;
+                let mut conn = connect.reply(Reply::Succeeded, WireAddress::unspecified()).await?;
                 log::trace!("{} -> {}", conn.peer_addr()?, target.peer_addr()?);
                 io::copy_bidirectional(&mut target, &mut conn).await?;
             } else {
-                let mut conn = connect.reply(Reply::HostUnreachable, Address::unspecified()).await?;
+                let mut conn = connect.reply(Reply::HostUnreachable, WireAddress::unspecified()).await?;
                 conn.shutdown().await?;
             }
         }
@@ -160,14 +160,14 @@ pub(crate) async fn handle_s5_upd_associate(associate: UdpAssociate<associate::N
 
     match udp_listener.and_then(|socket| socket.local_addr().map(|addr| (socket, addr))) {
         Err(err) => {
-            let mut conn = associate.reply(Reply::GeneralFailure, Address::unspecified()).await?;
+            let mut conn = associate.reply(Reply::GeneralFailure, WireAddress::unspecified()).await?;
             conn.shutdown().await?;
             Err(err.into())
         }
         Ok((listen_udp, listen_addr)) => {
             log::info!("[UDP] {listen_addr} listen on");
 
-            let s5_listen_addr = Address::from(listen_addr);
+            let s5_listen_addr = WireAddress::from(listen_addr);
             let mut reply_listener = associate.reply(Reply::Succeeded, s5_listen_addr).await?;
 
             let buf_size = MAX_UDP_RELAY_PACKET_SIZE - UdpHeader::max_serialized_len();

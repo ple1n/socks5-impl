@@ -7,7 +7,7 @@ mod response;
 mod udp;
 
 pub use self::{
-    address::{Address, AddressType},
+    address::{WireAddress, AddressType},
     command::Command,
     handshake::{
         password_method::{self, UserKey},

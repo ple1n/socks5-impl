@@ -3,7 +3,7 @@ mod util;
 use moka::future::Cache;
 use socks5_impl::{
     client,
-    protocol::{Address, UserKey},
+    protocol::{WireAddress, UserKey},
     Error, Result,
 };
 use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -247,7 +247,7 @@ async fn tcp_via_socks5_server<A, B>(
 ) -> Result<Vec<u8>>
 where
     A: ToSocketAddrs,
-    B: Into<Address>,
+    B: Into<WireAddress>,
 {
     let s5_proxy = TcpStream::connect(proxy_addr).await?;
     let mut stream = BufStream::new(s5_proxy);
