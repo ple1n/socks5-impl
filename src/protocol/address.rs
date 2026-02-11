@@ -52,7 +52,7 @@ impl From<AddressType> for u8 {
 /// |  1   | Variable |    2     |
 /// +------+----------+----------+
 /// ```
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize)]
 pub enum WireAddress {
     SocketAddress(SocketAddr),
     DomainAddress(String, u16),
