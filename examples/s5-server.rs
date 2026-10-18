@@ -1,5 +1,5 @@
 use socks5_impl::{
-    protocol::{WireAddress, Reply, UdpHeader},
+    protocol::{Reply, UdpHeader, WireAddress},
     server::{auth, connection::associate, AssociatedUdpSocket, ClientConnection, IncomingConnection, Server, UdpAssociate},
     Error, Result,
 };

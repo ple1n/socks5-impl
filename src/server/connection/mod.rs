@@ -1,6 +1,6 @@
 use self::{associate::UdpAssociate, bind::Bind, connect::Connect};
 use crate::{
-    protocol::{self, handshake, WireAddress, AsyncStreamOperation, AuthMethod, Command},
+    protocol::{self, handshake, AsyncStreamOperation, AuthMethod, Command, WireAddress},
     server::AuthAdaptor,
 };
 use std::{net::SocketAddr, time::Duration};

@@ -1,4 +1,4 @@
-use crate::protocol::{WireAddress, AsyncStreamOperation, Reply, Response, StreamOperation, UdpHeader};
+use crate::protocol::{AsyncStreamOperation, Reply, Response, StreamOperation, UdpHeader, WireAddress};
 use bytes::{Bytes, BytesMut};
 use std::{
     net::SocketAddr,

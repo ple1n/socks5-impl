@@ -1,4 +1,4 @@
-use crate::protocol::{WireAddress, AsyncStreamOperation, Reply, Response};
+use crate::protocol::{AsyncStreamOperation, Reply, Response, WireAddress};
 use std::{
     marker::PhantomData,
     net::SocketAddr,

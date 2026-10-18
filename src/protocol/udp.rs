@@ -1,6 +1,6 @@
 #[cfg(feature = "tokio")]
 use crate::protocol::AsyncStreamOperation;
-use crate::protocol::{WireAddress, StreamOperation};
+use crate::protocol::{StreamOperation, WireAddress};
 #[cfg(feature = "tokio")]
 use async_trait::async_trait;
 #[cfg(feature = "tokio")]

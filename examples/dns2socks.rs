@@ -3,7 +3,7 @@ mod util;
 use moka::future::Cache;
 use socks5_impl::{
     client,
-    protocol::{WireAddress, UserKey},
+    protocol::{UserKey, WireAddress},
     Error, Result,
 };
 use std::{net::SocketAddr, sync::Arc, time::Duration};

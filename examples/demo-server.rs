@@ -1,4 +1,4 @@
-use socks5_impl::protocol::{handshake, WireAddress, AsyncStreamOperation, AuthMethod, Reply, Request, Response};
+use socks5_impl::protocol::{handshake, AsyncStreamOperation, AuthMethod, Reply, Request, Response, WireAddress};
 use std::io;
 use tokio::{io::AsyncWriteExt, net::TcpListener};
 

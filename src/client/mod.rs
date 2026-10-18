@@ -2,7 +2,7 @@
 
 use crate::{
     error::{Error, Result},
-    protocol::{WireAddress, AddressType, AuthMethod, Command, Reply, StreamOperation, UserKey, Version},
+    protocol::{AddressType, AuthMethod, Command, Reply, StreamOperation, UserKey, Version, WireAddress},
 };
 use async_trait::async_trait;
 use std::{
@@ -531,7 +531,7 @@ impl UdpClientImpl<SocksUdpClient> {
 mod tests {
     use crate::{
         client::{self, SocksListener, SocksUdpClient, UdpClientTrait},
-        protocol::{WireAddress, UserKey},
+        protocol::{UserKey, WireAddress},
         Error, Result,
     };
     use async_trait::async_trait;
@@ -552,7 +552,9 @@ mod tests {
     async fn connect(addr: &str, auth: Option<UserKey>) {
         let socket = TcpStream::connect(addr).await.unwrap();
         let mut socket = BufStream::new(socket);
-        client::connect(&mut socket, WireAddress::from(("baidu.com", 80)), auth).await.unwrap();
+        client::connect(&mut socket, WireAddress::from(("baidu.com", 80)), auth)
+            .await
+            .unwrap();
     }
 
     #[ignore]
